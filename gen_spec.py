@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 import argparse
-import gzip
+import glob
 import os
 import re
 import subprocess
 import sys
-import tarfile
 from pathlib import Path
 
 
@@ -18,10 +17,14 @@ def extract_deb_control(deb_path: str) -> dict:
         sys.exit(1)
 
     control = {}
+    current_key = None
     for line in result.stdout.splitlines():
-        if ":" in line:
+        if line and not line[0].isspace() and ":" in line:
             key, value = line.split(":", 1)
-            control[key.strip()] = value.strip()
+            current_key = key.strip()
+            control[current_key] = value.strip()
+        elif current_key and line and line[0].isspace():
+            control[current_key] += "\n" + line.strip()
     return control
 
 
@@ -34,23 +37,6 @@ def extract_deb_scripts(deb_path: str) -> dict:
         if result.returncode == 0 and result.stdout.strip():
             scripts[script] = result.stdout
     return scripts
-
-
-def extract_deb_files(deb_path: str) -> list:
-    result = subprocess.run(
-        ["dpkg-deb", "--fsys-tarfile", deb_path], capture_output=True
-    )
-    if result.returncode != 0:
-        print(f"Error extracting files: {result.stderr}", file=sys.stderr)
-        sys.exit(1)
-
-    files = []
-    with tarfile.open(
-        fileobj=gzip.GzipFile(fileobj=BytesIO(result.stdout)), mode="r"
-    ) as tar:
-        for member in tar.getmembers():
-            files.append(member.name)
-    return files
 
 
 def parse_version(version_str: str) -> tuple:
@@ -88,61 +74,47 @@ Vendor: {maintainer}
 URL: https://lmstudio.ai
 BuildArch: x86_64
 
-## dpkg-deb --info "${{DEB}}" control ##
 %description
 {description.strip()}
+"""
+
+    if "preinst" in scripts:
+        spec_content += f"""
 
 
-
-## dpkg-deb --info "${{DEB}}" postinst ##
-%post
+%preinst
+{convert_shell_script(scripts["preinst"], name)}
 """
 
     if "postinst" in scripts:
-        spec_content += convert_shell_script(scripts["postinst"], name)
-    else:
-        spec_content += f"""if type update-alternatives 2>/dev/null >&1; then
-    # Remove previous link if it doesn't use update-alternatives
-    if [ -L '/usr/bin/{name}' -a -e '/usr/bin/{name}' -a "`readlink '/usr/bin/{name}'`" != '/etc/alternatives/{name}' ]; then
-        rm -f '/usr/bin/{name}'
-    fi
-    update-alternatives --install '/usr/bin/{name}' '{name}' '/opt/LM-Studio/{name}' 100 || ln -sf '/opt/LM-Studio/{name}' '/usr/bin/{name}'
-else
-    ln -sf '/opt/LM-Studio/{name}' '/usr/bin/{name}'
-fi
+        spec_content += f"""
 
-# SUID chrome-sandbox for Electron 5+
-chmod 4755 '/opt/LM-Studio/chrome-sandbox' || true
 
-if hash update-mime-database 2>/dev/null; then
-    update-mime-database /usr/share/mime || true
-fi
-
-if hash update-desktop-database 2>/dev/null; then
-    update-desktop-database /usr/share/applications || true
-fi
-
+%post
+{convert_shell_script(scripts["postinst"], name)}
 """
 
-    postrm_content = (
-        convert_shell_script(scripts["postrm"], name)
-        if "postrm" in scripts
-        else """# Delete the link to the binary
-if type update-alternatives >/dev/null 2>&1; then
-    update-alternatives --remove '{name}' '/usr/bin/{name}' 2>/dev/null || true
-else
-    rm -f '/usr/bin/{name}'
-fi
-"""
-    )
-    spec_content += f"""
+    if "prerm" in scripts:
+        spec_content += f"""
 
-## dpkg-deb --info "${{DEB}}" postrm ##
+
+%prerm
+{convert_shell_script(scripts["prerm"], name)}
+"""
+
+    if "postrm" in scripts:
+        spec_content += f"""
+
+
 %postun
-{postrm_content}
+{convert_shell_script(scripts["postrm"], name)}
+"""
+
+    spec_content += f"""
 
 
 %files
+/usr/bin/lm-studio
 /usr/share/doc/{name}
 /usr/share/applications/{name}.desktop
 /usr/share/icons/hicolor/1024x1024/apps/{name}.png
@@ -160,14 +132,7 @@ fi
 
 
 def convert_shell_script(script: str, name: str) -> str:
-    converted = script
-
-    if "/usr/bin/lm-studio" not in converted and "/opt/LM-Studio" in converted:
-        converted = converted.replace(
-            "/opt/LM-Studio/lm-studio", "/opt/LM-Studio/lm-studio"
-        )
-
-    return converted
+    return script
 
 
 def main():
@@ -188,8 +153,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    import glob
 
     deb_files = glob.glob(args.deb)
     if not deb_files:
@@ -219,6 +182,4 @@ def main():
 
 
 if __name__ == "__main__":
-    from io import BytesIO
-
     sys.exit(main())

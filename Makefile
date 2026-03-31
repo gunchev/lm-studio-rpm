@@ -77,6 +77,8 @@ install-deps:
 		sudo dnf install -y rpm-build dpkg; \
 	elif command -v yum >/dev/null 2>&1; then \
 		sudo yum install -y rpm-build dpkg; \
+	elif command -v zypper >/dev/null 2>&1; then \
+		sudo zypper install -y rpm-build dpkg; \
 	else \
 		echo "Cannot detect package manager. Please install: rpm-build, dpkg-dev"; \
 		exit 1; \
