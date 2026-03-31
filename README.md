@@ -33,6 +33,8 @@ make all          # Build both spec and RPM
 
 ## Files
 
+- `.editorconfig` - Editor configuration for consistent formatting
+- `.gitignore` - Git ignore rules for build artifacts
 - `gen_spec.py` - Extracts metadata from deb and generates spec file
 - `Makefile` - Automates the build process
 - `lm-studio.spec` - RPM spec file (generated)

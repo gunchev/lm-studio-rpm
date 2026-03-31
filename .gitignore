@@ -1,0 +1,20 @@
+# Build artifacts
+*.rpm
+*.spec
+
+# Debian packages
+*.deb
+
+# Build directories
+lm-studio/
+lm-studio-buildroot/
+
+# Python
+__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# Editor
+.idea/
+.vscode/
+*.swp
