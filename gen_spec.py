@@ -65,15 +65,8 @@ def generate_spec(
 
     source_line = ""
     prep_section = ""
-    extra_defines = ""
     if deb_filename:
-        source_line = f"Source0: {deb_filename}\n"
-        extra_defines = (
-            "%define __spec_install_post echo 'skipping'\n"
-            "%define _source_filedigest_algorithm md5\n"
-            "%define _binary_filedigest_algorithm md5\n"
-            "%define _unpackaged_files_terminate_build 0\n"
-        )
+        source_line = f"Source0: {deb_filename}"
         prep_section = (
             "\n%prep\n"
             + """
@@ -96,7 +89,8 @@ fi
     spec_content = f"""Name: {name}
 Version: {major}.{minor}.{patch}
 Release: 1
-{extra_defines}{source_line}Summary: {control.get("Description", "").split(chr(10))[0] or "No summary"}
+{source_line}
+Summary: {control.get("Description", "").split(chr(10))[0] or "No summary"}
 License: see /usr/share/doc/{name}/copyright
 Vendor: {maintainer}
 URL: https://lmstudio.ai
