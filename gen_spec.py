@@ -49,7 +49,9 @@ def parse_version(version_str: str) -> tuple:
     return ("0", "0", "0")
 
 
-def generate_spec(control: dict, scripts: dict, files: list, output: str):
+def generate_spec(
+    control: dict, scripts: dict, files: list, output: str, deb_filename: str = ""
+):
     name = control.get("Package", "lm-studio")
     version = control.get("Version", "0.0.0")
     major, minor, patch = parse_version(version)
@@ -61,21 +63,55 @@ def generate_spec(control: dict, scripts: dict, files: list, output: str):
         ["date", "+%a %b %d %Y"], capture_output=True, text=True
     ).stdout.strip()
 
-    spec_content = f"""%define _rpmdir ./
-%define _rpmfilename %%{{NAME}}-%%{{VERSION}}-%%{{RELEASE}}.%%{{ARCH}}.rpm
-%define _unpackaged_files_terminate_build 0
+    source_line = ""
+    prep_section = ""
+    extra_defines = ""
+    if deb_filename:
+        source_line = f"Source0: {deb_filename}\n"
+        extra_defines = (
+            "%define __spec_install_post echo 'skipping'\n"
+            "%define _source_filedigest_algorithm md5\n"
+            "%define _binary_filedigest_algorithm md5\n"
+            "%define _unpackaged_files_terminate_build 0\n"
+        )
+        prep_section = (
+            "\n%prep\n"
+            + """
+ar x "%{SOURCE0}"
+if test -f data.tar.xz; then
+    tar xf data.tar.xz
+elif test -f data.tar.gz; then
+    tar xzf data.tar.gz
+elif test -f data.tar.zst; then
+    tar xzf data.tar.zst
+fi
+rm -f debian-binary control.tar.* data.tar.*
+if test -d "./usr/share/icons/hicolor/0x0"; then
+    mv "./usr/share/icons/hicolor/0x0" "./usr/share/icons/hicolor/1024x1024"
+fi
 
-Name: {name}
+"""
+        )
+
+    spec_content = f"""Name: {name}
 Version: {major}.{minor}.{patch}
 Release: 1
-Summary: {control.get("Description", "").split(chr(10))[0] or "No summary"}
+{extra_defines}{source_line}Summary: {control.get("Description", "").split(chr(10))[0] or "No summary"}
 License: see /usr/share/doc/{name}/copyright
 Vendor: {maintainer}
 URL: https://lmstudio.ai
 BuildArch: x86_64
 
-%description
+{prep_section}%description
 {description.strip()}
+
+
+%install
+rm -rf %{{buildroot}}
+mkdir -p %{{buildroot}}
+cp -a usr %{{buildroot}}/
+cp -a opt %{{buildroot}}/
+
 """
 
     if "preinst" in scripts:
@@ -114,12 +150,11 @@ BuildArch: x86_64
 
 
 %files
-/usr/bin/lm-studio
+%defattr(-,root,root,-)
 /usr/share/doc/{name}
 /usr/share/applications/{name}.desktop
 /usr/share/icons/hicolor/1024x1024/apps/{name}.png
 /opt/LM-Studio
-
 
 
 %changelog
@@ -176,7 +211,7 @@ def main():
     control = extract_deb_control(deb_path)
     scripts = extract_deb_scripts(deb_path)
 
-    generate_spec(control, scripts, [], output_spec)
+    generate_spec(control, scripts, [], output_spec, deb_path)
 
     return 0
 
