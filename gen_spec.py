@@ -9,8 +9,16 @@ from pathlib import Path
 
 
 def extract_deb_control(deb_path: str) -> dict:
+    if not os.path.isfile(deb_path):
+        print(f"Error: Deb file not found: {deb_path}", file=sys.stderr)
+        sys.exit(1)
+
     result = subprocess.run(
-        ["dpkg-deb", "--info", deb_path, "control"], capture_output=True, text=True
+        ["dpkg-deb", "--info", deb_path, "control"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode != 0:
         print(f"Error extracting control: {result.stderr}", file=sys.stderr)
@@ -32,7 +40,11 @@ def extract_deb_scripts(deb_path: str) -> dict:
     scripts = {}
     for script in ["preinst", "postinst", "prerm", "postrm"]:
         result = subprocess.run(
-            ["dpkg-deb", "--info", deb_path, script], capture_output=True, text=True
+            ["dpkg-deb", "--info", deb_path, script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         if result.returncode == 0 and result.stdout.strip():
             scripts[script] = result.stdout
@@ -49,9 +61,7 @@ def parse_version(version_str: str) -> tuple:
     return ("0", "0", "0")
 
 
-def generate_spec(
-    control: dict, scripts: dict, files: list, output: str, deb_filename: str = ""
-):
+def generate_spec(control: dict, scripts: dict, output: str, deb_filename: str = ""):
     name = control.get("Package", "lm-studio")
     version = control.get("Version", "0.0.0")
     major, minor, patch = parse_version(version)
@@ -73,6 +83,7 @@ def generate_spec(
             "%define _source_filedigest_algorithm md5\n"
             "%define _binary_filedigest_algorithm md5\n"
             "%define _unpackaged_files_terminate_build 0\n"
+            "%define __brp_mangle_shebangs /bin/true\n"
         )
         prep_section = (
             "\n%prep\n"
@@ -116,34 +127,26 @@ cp -a opt %{{buildroot}}/
 
     if "preinst" in scripts:
         spec_content += f"""
-
-
 %preinst
-{convert_shell_script(scripts["preinst"], name)}
+{scripts["preinst"]}
 """
 
     if "postinst" in scripts:
         spec_content += f"""
-
-
 %post
-{convert_shell_script(scripts["postinst"], name)}
+{scripts["postinst"]}
 """
 
     if "prerm" in scripts:
         spec_content += f"""
-
-
 %prerm
-{convert_shell_script(scripts["prerm"], name)}
+{scripts["prerm"]}
 """
 
     if "postrm" in scripts:
         spec_content += f"""
-
-
 %postun
-{convert_shell_script(scripts["postrm"], name)}
+{scripts["postrm"]}
 """
 
     spec_content += f"""
@@ -162,8 +165,11 @@ cp -a opt %{{buildroot}}/
 - Converted from deb package {version}
 """
 
-    Path(output).write_text(spec_content)
-    print(f"Spec file written to: {output}")
+    if output == "/dev/stdout" or output == "-":
+        print(spec_content)
+    else:
+        Path(output).write_text(spec_content)
+        print(f"Spec file written to: {output}")
 
 
 def convert_shell_script(script: str, name: str) -> str:
@@ -211,7 +217,7 @@ def main():
     control = extract_deb_control(deb_path)
     scripts = extract_deb_scripts(deb_path)
 
-    generate_spec(control, scripts, [], output_spec, deb_path)
+    generate_spec(control, scripts, output_spec, deb_path)
 
     return 0
 

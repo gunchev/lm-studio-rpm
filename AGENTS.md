@@ -18,7 +18,6 @@ This repository converts LM Studio Debian packages to RPM format for Fedora/RHEL
 ```bash
 make all              # Generate spec and build RPM using mock (full pipeline)
 make mock             # Build RPM using mock (from existing spec)
-make mock-srpm        # Build SRPM using mock
 make spec             # Generate spec file from deb package
 make rpm              # Build RPM using rpmbuild (local, for testing)
 make test             # Test metadata extraction (./gen_spec.py output to stdout)
@@ -39,10 +38,7 @@ make spec
 # Step 2: Download/verify sources (copies Source0 to SOURCES/)
 make sources
 
-# Step 3: Build SRPM
-make mock-srpm
-
-# Step 4: Build RPM from SRPM
+# Step 3: Build SRPM and RPM with mock
 make mock
 ```
 
@@ -247,12 +243,11 @@ sudo zypper install rpm-build dpkg mock
 
 | Location | Function | Purpose |
 |----------|----------|---------|
-| `gen_spec.py:13` | `extract_deb_control()` | Extract package metadata from deb control file |
+| `gen_spec.py:11` | `extract_deb_control()` | Extract package metadata from deb control file |
 | `gen_spec.py:31` | `extract_deb_scripts()` | Extract pre/post install scripts |
 | `gen_spec.py:42` | `parse_version()` | Parse semantic version string to tuple |
 | `gen_spec.py:52` | `generate_spec()` | Generate complete RPM spec content |
-| `Makefile:62` | `mock-srpm` target | Build SRPM using mock |
-| `Makefile:69` | `mock` target | Build RPM using mock |
+| `Makefile:71` | `mock` target | Build SRPM and RPM using mock |
 
 ## Troubleshooting
 

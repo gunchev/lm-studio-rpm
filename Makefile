@@ -57,7 +57,6 @@ spec: gen_spec.py
 rpm: spec
 	@echo "Building RPM package..."
 	rpmbuild -bb --target x86_64 "$(SPEC)"
-	# mv *.rpm "$(RPM_DIR)/" 2>/dev/null || true
 	@echo "RPM built successfully!"
 
 
