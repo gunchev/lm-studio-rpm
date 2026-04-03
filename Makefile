@@ -12,11 +12,12 @@ help:
 	@echo "  make [target]"
 	@echo ""
 	@echo "Targets:"
+	@echo "  download     Download latest deb package from lmstudio.ai"
 	@echo "  spec         Generate spec file from deb package"
 	@echo "  rpm          Build RPM using rpmbuild (local)"
 	@echo "  mock-srpm    Build SRPM using mock"
 	@echo "  mock         Build RPM using mock"
-	@echo "  all          Build spec and RPM using mock"
+	@echo "  all          Download, generate spec, and build RPM using mock"
 	@echo "  sources      Download/verify sources for spec"
 	@echo "  clean        Remove build artifacts"
 	@echo "  test         Test metadata extraction"
@@ -30,7 +31,20 @@ help:
 
 
 .PHONY: all
-all: spec mock
+all: download spec mock
+
+
+.PHONY: download
+download:
+	@echo "Downloading latest LM Studio deb package..."
+	@url=$$(curl -sI -L 'https://lmstudio.ai/download/latest/linux/x64?format=deb' | grep -i '^location:' | tail -1 | tr -d '\r' | cut -d ' ' -f 2-); \
+	if [ -z "$$url" ]; then \
+		echo "Error: Could not get download URL"; \
+		exit 1; \
+	fi; \
+	echo "Downloading: $$url"; \
+	curl -C - -L -O "$$url"
+	@echo "Download complete"
 
 
 .PHONY: spec
@@ -86,14 +100,14 @@ test:
 install-deps:
 	@echo "Installing build dependencies..."
 	@if command -v apt-get >/dev/null 2>&1; then \
-		sudo apt-get install -y rpm build-essential dpkg-dev mock rpm; \
+		sudo apt-get install -y rpm build-essential dpkg-dev mock rpm curl; \
 	elif command -v dnf >/dev/null 2>&1; then \
-		sudo dnf install -y rpm-build dpkg mock; \
+		sudo dnf install -y rpm-build dpkg mock curl; \
 	elif command -v yum >/dev/null 2>&1; then \
-		sudo yum install -y rpm-build dpkg mock; \
+		sudo yum install -y rpm-build dpkg mock curl; \
 	elif command -v zypper >/dev/null 2>&1; then \
-		sudo zypper install -y rpm-build dpkg mock; \
+		sudo zypper install -y rpm-build dpkg mock curl; \
 	else \
-		echo "Cannot detect package manager. Please install: rpm-build, dpkg-dev, mock"; \
+		echo "Cannot detect package manager. Please install: rpm-build, dpkg-dev, mock, curl"; \
 		exit 1; \
 	fi
