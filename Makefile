@@ -15,8 +15,7 @@ help:
 	@echo "  download     Download latest deb package from lmstudio.ai"
 	@echo "  spec         Generate spec file from deb package"
 	@echo "  rpm          Build RPM using rpmbuild (local)"
-	@echo "  mock-srpm    Build SRPM using mock"
-	@echo "  mock         Build RPM using mock"
+	@echo "  mock         Build SRPM and RPM using mock"
 	@echo "  all          Download, generate spec, and build RPM using mock"
 	@echo "  sources      Download/verify sources for spec"
 	@echo "  clean        Remove build artifacts"
@@ -32,6 +31,7 @@ help:
 
 .PHONY: all
 all: download spec mock
+
 
 
 .PHONY: download
@@ -61,20 +61,18 @@ rpm: spec
 	@echo "RPM built successfully!"
 
 
+
 .PHONY: sources
 sources:
 	@spectool -g -S ./*.spec
 
 
-.PHONY: mock-srpm
-mock-srpm: spec sources
-	@echo "Building SRPM with mock..."
-	mkdir -p "$(RPM_DIR)"
-	mock --buildsrpm --sources=./ --spec ./*.spec --resultdir="$(RPM_DIR)/"
-
 
 .PHONY: mock
 mock: spec sources
+	@echo "Building SRPM with mock..."
+	mkdir -p "$(RPM_DIR)"
+	mock --buildsrpm --sources=./ --spec ./*.spec --resultdir="$(RPM_DIR)/"
 	@echo "Building RPM with mock..."
 	mkdir -p "$(RPM_DIR)"
 	mock --rebuild "$(RPM_DIR)"/*.src.rpm --resultdir="$(RPM_DIR)/"
