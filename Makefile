@@ -56,7 +56,7 @@ spec: gen_spec.py
 .PHONY: rpm
 rpm: spec
 	@echo "Building RPM package..."
-	rpmbuild -bb --target x86_64 "$(SPEC)"
+	rpmbuild -bb --target x86_64 --define "_sourcedir $(CURDIR)" "$(SPEC)"
 	@echo "RPM built successfully!"
 
 
